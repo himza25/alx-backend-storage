@@ -1,6 +1,3 @@
--- Drops the existing stored procedure if it exists
-DROP PROCEDURE IF EXISTS ComputeAverageWeightedScoreForUser;
-
 -- Create the stored procedure ComputeAverageWeightedScoreForUser
 DELIMITER //
 CREATE PROCEDURE ComputeAverageWeightedScoreForUser(IN user_id INT)

@@ -1,16 +1,22 @@
--- Drops the existing procedure if it already exists
+-- Drops the existing stored procedure if it exists
 DROP PROCEDURE IF EXISTS ComputeAverageScoreForUser;
 
--- Resets the delimiter to allow for the entire procedure to be defined as a single command
+-- Set the delimiter to handle complex stored procedure statements
 DELIMITER //
 
--- Creates the stored procedure to compute and update the average score
+-- Create the stored procedure ComputeAverageScoreForUser
 CREATE PROCEDURE ComputeAverageScoreForUser(IN user_id INT)
 BEGIN
-    -- Declare a session variable to store the computed average score
-    SET @user_avg = (SELECT AVG(score) FROM corrections WHERE user_id = user_id);
+    -- Declare a variable to hold the computed average score
+    DECLARE user_avg FLOAT;
 
-    -- Update the average_score field in the users table for the specified user_id
-    UPDATE users SET average_score = @user_avg WHERE id = user_id;
+    -- Calculate the average score from the corrections table
+    SELECT AVG(score) INTO user_avg FROM corrections WHERE user_id = user_id;
+
+    -- Check if the average score is NULL, which can happen if no scores exist, and set it to 0 in that case
+    SET user_avg = IFNULL(user_avg, 0);
+
+    -- Update the average_score in the users table with the calculated average or 0 if no scores were present
+    UPDATE users SET average_score = user_avg WHERE id = user_id;
 END //
 DELIMITER ;

@@ -1,16 +1,17 @@
--- Drops the existing stored procedure if it exists
+-- Drops the existing procedure if it already exists
 DROP PROCEDURE IF EXISTS ComputeAverageScoreForUser;
 
--- Recreate the stored procedure ComputeAverageScoreForUser
+-- Creates a new stored procedure
 DELIMITER //
 CREATE PROCEDURE ComputeAverageScoreForUser(IN user_id INT)
 BEGIN
-    DECLARE avg_score FLOAT DEFAULT 0;
+    -- Declare a variable to store the computed average score
+    DECLARE avg_score FLOAT;
 
-    -- Compute the average score if there are corrections, otherwise leave as default 0
-    SELECT IFNULL(AVG(score), 0) INTO avg_score FROM corrections WHERE user_id = user_id;
+    -- Compute the average score for the given user_id
+    SELECT AVG(score) INTO avg_score FROM corrections WHERE user_id = user_id;
 
-    -- Update the average score in the users table
+    -- Update the average_score in the users table
     UPDATE users SET average_score = avg_score WHERE id = user_id;
-END; //
+END //
 DELIMITER ;

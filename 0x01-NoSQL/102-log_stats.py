@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Advanced logging stats script for nginx logs.
+Advanced logging stats script for nginx logs in MongoDB.
 """
 
 from pymongo import MongoClient
 
 def log_stats():
-    """ Function to print logs statistics including top 10 IPs. """
+    """ Function to print logs statistics, enhanced to include top 10 IPs. """
     client = MongoClient('mongodb://127.0.0.1:27017/')
     db = client.logs
     nginx_collection = db.nginx

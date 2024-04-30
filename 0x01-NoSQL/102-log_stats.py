@@ -1,41 +1,35 @@
 #!/usr/bin/env python3
 """
-Advanced logging stats script for nginx logs in MongoDB.
+Python script that provides enhanced stats
+about Nginx logs stored in MongoDB, including top 10 IPs.
 """
 
-from pymongo import MongoClient
+import pymongo
 
-def log_stats():
-    """ Function to print logs statistics, enhanced to include top 10 IPs. """
-    client = MongoClient('mongodb://127.0.0.1:27017/')
-    db = client.logs
-    nginx_collection = db.nginx
-    
-    # Total logs
-    total_logs = nginx_collection.count_documents({})
-    print(f"{total_logs} logs")
-    
-    # HTTP methods
-    methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
-    print("Methods:")
-    for method in methods:
-        count = nginx_collection.count_documents({'method': method})
-        print(f"    method {method}: {count}")
-    
-    # Status checks
-    status_check = nginx_collection.count_documents({'method': 'GET', 'path': '/status'})
-    print(f"{status_check} status check")
-    
-    # Top 10 IPs
-    top_ips = nginx_collection.aggregate([
-        {'$group': {'_id': '$ip', 'count': {'$sum': 1}}},
-        {'$sort': {'count': -1}},
-        {'$limit': 10}
-    ])
-    
-    print("IPs:")
-    for ip in top_ips:
-        print(f"    {ip['_id']}: {ip['count']}")
+def get_top_ips(collection, limit=10):
+    """ Retrieve top IPs using aggregation. """
+    pipeline = [
+        {"$group": {"_id": "$ip", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": limit}
+    ]
+    return list(collection.aggregate(pipeline))
 
 if __name__ == "__main__":
-    log_stats()
+    client = pymongo.MongoClient("mongodb://127.0.0.1:27017")
+    db = client.logs
+    col = db.nginx
+
+    print(f"{col.count_documents({})} logs")
+    print("Methods:")
+    methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    for method in methods:
+        print(f"\tmethod {method}: {col.count_documents({'method': method})}")
+
+    status_checks = col.count_documents({"method": "GET", "path": "/status"})
+    print(f"{status_checks} status check")
+    
+    top_ips = get_top_ips(col)
+    print("IPs:")
+    for entry in top_ips:
+        print(f"\t{entry['_id']}: {entry['count']}")

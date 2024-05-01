@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Enhance Cache class with decorators for counting method calls and storing
-call histories in Redis.
+Enhance Cache class with decorators for counting method calls, storing
+call histories, and replaying those histories from Redis.
 """
 import uuid
 import redis
@@ -25,13 +25,24 @@ def call_history(method: Callable) -> Callable:
     def wrapper(self, *args, **kwargs):
         input_key = f"{method.__qualname__}:inputs"
         output_key = f"{method.__qualname__}:outputs"
-        # Convert all arguments to strings and store them
         self._redis.rpush(input_key, str(args))
         result = method(self, *args, **kwargs)
-        # Store the output
         self._redis.rpush(output_key, str(result))
         return result
     return wrapper
+
+
+def replay(method: Callable):
+    """Function to show the history of calls of a method."""
+    qualified_name = method.__qualname__
+    inputs = method.__self__._redis.lrange(f"{qualified_name}:inputs", 0, -1)
+    outputs = method.__self__._redis.lrange(f"{qualified_name}:outputs", 0, -1)
+    count = method.__self__._redis.get(qualified_name)
+    print(f"{qualified_name} was called {count.decode()} times:")
+    for input_val, output_val in zip(inputs, outputs):
+        input_str = input_val.decode()
+        output_str = output_val.decode()
+        print(f"{qualified_name}(*{input_str}) -> {output_str}")
 
 
 class Cache:
@@ -54,9 +65,7 @@ class Cache:
 
     def get(self, key: str, fn: Optional[Callable] = None) -> \
             Union[str, bytes, int, float, None]:
-        """
-        Retrieve data from Redis by key. Optionally process with fn.
-        """
+        """Retrieve data from Redis by key. Optionally process with fn."""
         data = self._redis.get(key)
         if data is not None and fn:
             return fn(data)

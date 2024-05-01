@@ -11,6 +11,7 @@ from typing import Callable
 # Connect to the Redis server
 redis_client = redis.Redis()
 
+
 def cache_page(expiration: int = 10):
     """
     Decorator to cache web pages and count accesses using Redis.
@@ -22,7 +23,7 @@ def cache_page(expiration: int = 10):
             # Increment access count for the URL
             count_key = f"count:{url}"
             redis_client.incr(count_key)
-            
+
             # Try to retrieve the cached page
             cache_key = f"cache:{url}"
             cached_page = redis_client.get(cache_key)
@@ -35,6 +36,7 @@ def cache_page(expiration: int = 10):
             return page_content
         return wrapper
     return decorator
+
 
 @cache_page()
 def get_page(url: str) -> str:

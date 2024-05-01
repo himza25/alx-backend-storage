@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
 """
-Cache module to interact with Redis
+This module provides a Cache class for storing and retrieving data from
+Redis, maintaining data types across storage and retrieval operations.
 """
-import redis
 import uuid
-from typing import Union
+import redis
+from typing import Union, Callable, Optional
 
 
 class Cache:
-    """
-    Cache class to manage a Redis connection and store data with random keys.
-    """
+    """Cache class for storing and retrieving data from Redis."""
     def __init__(self):
-        """ Initialize a Redis client and flush the database. """
+        """Initialize a Redis client and flush the database."""
         self._redis = redis.Redis()
         self._redis.flushdb()
 
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """
-        Store the data in Redis using a random key and return the key.
+        Store data in Redis using a random key and return the key.
         """
         key = str(uuid.uuid4())
         self._redis.set(key, data)

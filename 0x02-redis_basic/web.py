@@ -1,36 +1,46 @@
 #!/usr/bin/env python3
 """
-web cache and tracker
+Module to fetch web pages and cache their contents with an expiration time,
+also tracks the number of accesses per URL.
 """
-import requests
 import redis
+import requests
 from functools import wraps
+from typing import Callable
 
-store = redis.Redis()
+# Connect to the Redis server
+redis_client = redis.Redis()
 
+def cache_page(expiration: int = 10):
+    """
+    Decorator to cache web pages and count accesses using Redis.
+    Pages are cached with an expiration time.
+    """
+    def decorator(function: Callable):
+        @wraps(function)
+        def wrapper(url: str) -> str:
+            # Increment access count for the URL
+            count_key = f"count:{url}"
+            redis_client.incr(count_key)
+            
+            # Try to retrieve the cached page
+            cache_key = f"cache:{url}"
+            cached_page = redis_client.get(cache_key)
+            if cached_page:
+                return cached_page.decode()
 
-def count_url_access(method):
-    """ Decorator counting how many times
-    a URL is accessed """
-    @wraps(method)
-    def wrapper(url):
-        cached_key = "cached:" + url
-        cached_data = store.get(cached_key)
-        if cached_data:
-            return cached_data.decode("utf-8")
+            # Fetch the page and cache it
+            page_content = function(url)
+            redis_client.setex(cache_key, expiration, page_content)
+            return page_content
+        return wrapper
+    return decorator
 
-        count_key = "count:" + url
-        html = method(url)
-
-        store.incr(count_key)
-        store.set(cached_key, html)
-        store.expire(cached_key, 10)
-        return html
-    return wrapper
-
-
-@count_url_access
+@cache_page()
 def get_page(url: str) -> str:
-    """ Returns HTML content of a url """
-    res = requests.get(url)
-    return res.text
+    """
+    Fetch the HTML content of the given URL.
+    Decorated to cache its result and track access counts.
+    """
+    response = requests.get(url)
+    return response.text

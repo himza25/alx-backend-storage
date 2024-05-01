@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-This module enhances the Cache class with the ability to count method calls
-using a decorator, storing these counts in Redis.
+Enhance Cache class with decorators for counting method calls and storing
+call histories in Redis.
 """
 import uuid
 import redis
@@ -10,14 +10,27 @@ from functools import wraps
 
 
 def count_calls(method: Callable) -> Callable:
-    """
-    Decorator to count the number of times a method is called.
-    """
+    """Decorator to count the number of times a method is called."""
     @wraps(method)
     def wrapper(self, *args, **kwargs):
         key = method.__qualname__
         self._redis.incr(key)
         return method(self, *args, **kwargs)
+    return wrapper
+
+
+def call_history(method: Callable) -> Callable:
+    """Decorator to store the history of inputs and outputs of a method."""
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        input_key = f"{method.__qualname__}:inputs"
+        output_key = f"{method.__qualname__}:outputs"
+        # Convert all arguments to strings and store them
+        self._redis.rpush(input_key, str(args))
+        result = method(self, *args, **kwargs)
+        # Store the output
+        self._redis.rpush(output_key, str(result))
+        return result
     return wrapper
 
 
@@ -29,10 +42,11 @@ class Cache:
         self._redis.flushdb()
 
     @count_calls
+    @call_history
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """
         Store data in Redis using a random key and return the key.
-        Decorated to count calls.
+        Decorated to count calls and store call history.
         """
         key = str(uuid.uuid4())
         self._redis.set(key, data)

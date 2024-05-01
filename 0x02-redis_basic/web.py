@@ -1,47 +1,49 @@
 #!/usr/bin/env python3
-
-import redis
+"""
+Module to implement a simple web page fetcher with caching and access counting
+using Redis.
+"""
 import requests
+import redis
 from functools import wraps
+from typing import Callable
+
+# Create a Redis client instance
+_redis = redis.Redis()
 
 
-def cache_decorator(ttl: int = 10):
-    """
-    A decorator to cache the result of a function with an expiration time.
-
-    Args:
-        ttl (int): The time to live in seconds.
-
-    Returns:
-        A decorator function.
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(url: str) -> str:
-            redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
-            cache_key = f"cache:{url}"
-            count_key = f"count:{url}"
-            if redis_client.exists(cache_key):
-                return redis_client.get(cache_key).decode('utf-8')
-            else:
-                result = func(url)
-                redis_client.setex(cache_key, ttl, result)
-                redis_client.incr(count_key)
-                return result
-        return wrapper
-    return decorator
+def count_requests(method: Callable) -> Callable:
+    """Decorator to count the number of times a method is called."""
+    @wraps(method)
+    def wrapper(*args, **kwargs):
+        url = args[0]
+        count_key = f"count:{url}"
+        _redis.incr(count_key)
+        return method(*args, **kwargs)
+    return wrapper
 
 
-@cache_decorator(ttl=10)
+def cache_page(method: Callable) -> Callable:
+    """Decorator to cache the page content."""
+    @wraps(method)
+    def wrapper(url: str) -> str:
+        cache_key = f"cache:{url}"
+        cached_content = _redis.get(cache_key)
+        if cached_content:
+            return cached_content.decode('utf-8')
+        else:
+            content = method(url)
+            _redis.setex(cache_key, 10, content)
+            return content
+    return wrapper
+
+
+@count_requests
+@cache_page
 def get_page(url: str) -> str:
     """
-    Get the HTML content of a particular URL.
-
-    Args:
-        url (str): The URL to retrieve.
-
-    Returns:
-        str: The HTML content of the URL.
+    Obtain the HTML content of a URL and return it. Keep track of the number of
+    times the URL was accessed and cache the content with an expiration time.
     """
     response = requests.get(url)
     return response.text

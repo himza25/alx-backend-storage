@@ -1,46 +1,47 @@
 #!/usr/bin/env python3
-"""
-Module to cache web pages and track access count with an expiring cache.
-"""
-import redis
+"""Module for caching and tracking web page accesses using Redis."""
+
 import requests
+from redis import Redis
 from functools import wraps
 
-# Redis client setup
-r = redis.Redis()
+# Setup the Redis connection
+redis = Redis(host='localhost', port=6379, db=0)
 
 
-def count_accesses(func):
-    """Decorator to count accesses for a given URL."""
+def cache(func):
+    """Decorator to cache pages and track page access counts."""
     @wraps(func)
-    def wrapper(url):
-        # Increment access count for the URL
+    def wrapper(url: str) -> str:
+        """Retrieve web page from cache or fetch and cache it."""
         count_key = f"count:{url}"
-        r.incr(count_key)
-        return func(url)
-    return wrapper
-
-
-def cache_page(func):
-    """Decorator to cache the webpage content."""
-    @wraps(func)
-    def wrapper(url):
-        # Check if the page is already cached
         cache_key = f"cache:{url}"
-        cached_page = r.get(cache_key)
-        if cached_page is not None:
-            return cached_page.decode()
 
-        # If not cached, fetch the page and cache it
+        # Increment the access count
+        redis.incr(count_key)
+
+        # Attempt to retrieve the cached content
+        cached_content = redis.get(cache_key)
+        if cached_content:
+            return cached_content.decode('utf-8')
+
+        # If cache miss, fetch the content and cache it
         page_content = func(url)
-        r.setex(cache_key, 10, page_content)
+        redis.setex(cache_key, 10, page_content)  # Expire after 10 seconds
         return page_content
+
     return wrapper
 
 
-@count_accesses
-@cache_page
+@cache
 def get_page(url: str) -> str:
-    """Fetch the HTML content of a URL and cache it with an expiration."""
+    """Fetch HTML content of a URL, caching the results."""
     response = requests.get(url)
     return response.text
+
+
+if __name__ == "__main__":
+    # Example URL that simulates a slow response
+    slow_url = ("http://slowwly.robertomurray.co.uk/delay/5000/url/"
+                "http://www.google.com")
+    print(get_page(slow_url))

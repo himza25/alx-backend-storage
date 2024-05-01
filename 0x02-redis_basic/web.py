@@ -1,52 +1,42 @@
 #!/usr/bin/env python3
 """
-web cache and tracker
+This module implements a web cache and tracker, caching the HTML content
+of URLs for 10 seconds and tracking the count of accesses per URL.
 """
+
 import requests
 import redis
 from functools import wraps
 
 
-# Redis client setup
+# Create a Redis connection
 store = redis.Redis()
 
 
 def count_url_access(method):
-    """
-    Decorator counting how many times a URL is accessed
-    """
+    """Decorator to count URL accesses and cache the HTML content."""
     @wraps(method)
     def wrapper(url):
-        cached_key = "cached:" + url
+        count_key = f"count:{url}"
+        cached_key = f"cached:{url}"
+
+        # Check if the URL is already cached
         cached_data = store.get(cached_key)
         if cached_data:
-            return cached_data.decode("utf-8")
+            return cached_data.decode('utf-8')
 
-        # Execute the method and get HTML data
+        # Fetch the HTML content if not cached
         html = method(url)
 
-        # Increment the access count and set the cache
-        # with expiration
-        count_key = "count:" + url
+        # Increment access count and set cache with expiration
         store.incr(count_key)
-        store.set(cached_key, html)
-        store.expire(cached_key, 10)
-
+        store.set(cached_key, html, ex=10)  # Expires in 10 seconds
         return html
     return wrapper
 
 
 @count_url_access
 def get_page(url: str) -> str:
-    """
-    Returns HTML content of a URL
-    """
+    """Fetch and return the HTML content of a given URL."""
     response = requests.get(url)
     return response.text
-
-
-# Example usage
-if __name__ == "__main__":
-    url = "http://slowwly.robertomurray.co.uk/delay/5000/url/http://www.google.com"
-    print(get_page(url))  # First fetch, should not be cached
-    print(get_page(url))  # Second fetch, should be from the cache²:wq

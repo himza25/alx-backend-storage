@@ -1,49 +1,52 @@
 #!/usr/bin/env python3
 """
-Module to implement a simple web page fetcher with caching and access counting
-using Redis.
+web cache and tracker
 """
 import requests
 import redis
 from functools import wraps
-from typing import Callable
-
-# Create a Redis client instance
-_redis = redis.Redis()
 
 
-def count_requests(method: Callable) -> Callable:
-    """Decorator to count the number of times a method is called."""
+# Redis client setup
+store = redis.Redis()
+
+
+def count_url_access(method):
+    """
+    Decorator counting how many times a URL is accessed
+    """
     @wraps(method)
-    def wrapper(*args, **kwargs):
-        url = args[0]
-        count_key = f"count:{url}"
-        _redis.incr(count_key)
-        return method(*args, **kwargs)
+    def wrapper(url):
+        cached_key = "cached:" + url
+        cached_data = store.get(cached_key)
+        if cached_data:
+            return cached_data.decode("utf-8")
+
+        # Execute the method and get HTML data
+        html = method(url)
+
+        # Increment the access count and set the cache
+        # with expiration
+        count_key = "count:" + url
+        store.incr(count_key)
+        store.set(cached_key, html)
+        store.expire(cached_key, 10)
+
+        return html
     return wrapper
 
 
-def cache_page(method: Callable) -> Callable:
-    """Decorator to cache the page content."""
-    @wraps(method)
-    def wrapper(url: str) -> str:
-        cache_key = f"cache:{url}"
-        cached_content = _redis.get(cache_key)
-        if cached_content:
-            return cached_content.decode('utf-8')
-        else:
-            content = method(url)
-            _redis.setex(cache_key, 10, content)
-            return content
-    return wrapper
-
-
-@count_requests
-@cache_page
+@count_url_access
 def get_page(url: str) -> str:
     """
-    Obtain the HTML content of a URL and return it. Keep track of the number of
-    times the URL was accessed and cache the content with an expiration time.
+    Returns HTML content of a URL
     """
     response = requests.get(url)
     return response.text
+
+
+# Example usage
+if __name__ == "__main__":
+    url = "http://slowwly.robertomurray.co.uk/delay/5000/url/http://www.google.com"
+    print(get_page(url))  # First fetch, should not be cached
+    print(get_page(url))  # Second fetch, should be from the cache²:wq

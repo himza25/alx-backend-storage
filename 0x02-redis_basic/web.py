@@ -1,42 +1,36 @@
 #!/usr/bin/env python3
 """
-This module implements a web cache and tracker, caching the HTML content
-of URLs for 10 seconds and tracking the count of accesses per URL.
+web cache and tracker
 """
-
 import requests
 import redis
 from functools import wraps
 
-
-# Create a Redis connection
 store = redis.Redis()
 
 
 def count_url_access(method):
-    """Decorator to count URL accesses and cache the HTML content."""
+    """ Decorator counting how many times
+    a URL is accessed """
     @wraps(method)
     def wrapper(url):
-        count_key = f"count:{url}"
-        cached_key = f"cached:{url}"
-
-        # Check if the URL is already cached
+        cached_key = "cached:" + url
         cached_data = store.get(cached_key)
         if cached_data:
-            return cached_data.decode('utf-8')
+            return cached_data.decode("utf-8")
 
-        # Fetch the HTML content if not cached
+        count_key = "count:" + url
         html = method(url)
 
-        # Increment access count and set cache with expiration
         store.incr(count_key)
-        store.set(cached_key, html, ex=10)  # Expires in 10 seconds
+        store.set(cached_key, html)
+        store.expire(cached_key, 10)
         return html
     return wrapper
 
 
 @count_url_access
 def get_page(url: str) -> str:
-    """Fetch and return the HTML content of a given URL."""
-    response = requests.get(url)
-    return response.text
+    """ Returns HTML content of a url """
+    res = requests.get(url)
+    return res.text
